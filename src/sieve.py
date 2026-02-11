@@ -9,49 +9,53 @@ class IntentSieve:
         self.guard = ChatOllama(model="llama-guard3:8b", temperature=0)
         
     def _is_argument_consistent(self, original_intent, tool_args):
-        """
-        Check if the tool arguments (like filenames or URLs) 
-        actually appear or are implied in the original intent.
-        """
         intent_lower = original_intent.lower()
         for val in tool_args.values():
+            # Simple heuristic: argument value must be present in intent
             if str(val).lower() not in intent_lower:
-                # Basic check: if the user didn't mention the target, it's suspicious
                 return False
         return True
 
     def validate(self, original_intent, tool_call):
+        """
+        Returns a tuple: (STATUS, REASON)
+        STATUS can be: "ALLOW", "BLOCK", "REVIEW"
+        """
         start_time = time.time()
         action = tool_call['name']
         args = tool_call['args']
         
         print(f"\n[SIEVE] Analyzing action: {action}...")
 
-        # --- LAYER 1: SYMBOLIC (Intent & Argument Matching) ---
-        # Instead of just "delete", we check if the action AND the target match the intent
+        # --- LAYER 1: SYMBOLIC (Hallucination/Drift Check) ---
+        # We ensure the model isn't inventing actions the user didn't ask for.
         is_destructive = any(word in action.lower() for word in ["delete", "remove", "clear"])
         
         if is_destructive:
-            # Check if user actually asked to delete something
             intent_authorized = any(word in original_intent.lower() for word in ["delete", "remove", "clean"])
-            # Check if the specific target in 'args' was mentioned
             args_authorized = self._is_argument_consistent(original_intent, args)
 
             if not (intent_authorized and args_authorized):
-                latency = time.time() - start_time
-                msg = f"REJECTED: Semantic Drift! Action '{action}' or target {args} not authorized. Time: {latency:.2f}s"
-                logging.warning(msg)
-                return False, msg
+                return "BLOCK", f"Semantic Drift! Action '{action}' not explicitly requested."
 
-        # --- LAYER 2: NEURAL (Universal Guardrail) ---
-        # Run Llama Guard for ALL tool calls to detect indirect prompt injections
+        # --- LAYER 2: NEURAL (Security Check) ---
+        # Check for Prompt Injection or Jailbreaks
         check_msg = f"User Intent: {original_intent}\nProposed Action: {action}({args})"
         response = self.guard.invoke([HumanMessage(content=check_msg)])
         
         if "unsafe" in response.content.lower():
-            latency = time.time() - start_time
-            return False, f"NEURAL BLOCK: Llama Guard flagged as unsafe. Time: {latency:.2f}s"
+            return "BLOCK", "Llama Guard flagged as unsafe (Potential Injection)."
 
+        # --- LAYER 3: RISK ASSESSMENT (Routing) ---
+        # If we pass Layer 1 & 2, the action is 'valid', but might still be risky.
+        # We route destructive actions to Human-in-the-Loop.
+        
+        if is_destructive:
+            latency = time.time() - start_time
+            logging.warning(f"REVIEW REQUIRED: {action} (Time: {latency:.2f}s)")
+            return "REVIEW", "Destructive action detected."
+
+        # If it's not destructive and passed safety checks, it's low risk.
         latency = time.time() - start_time
         logging.info(f"AUTHORIZED: {action} (Time: {latency:.2f}s)")
-        return True, None
+        return "ALLOW", "Low risk action."
