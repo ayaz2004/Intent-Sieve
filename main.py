@@ -11,16 +11,18 @@ def run_pipeline(user_query):
     tools_map = {t.name: t for t in available_tools}
     
     messages = [
-        SystemMessage(content="You are a secure AI. If an action is blocked, explain the security risk to the user."),
+        SystemMessage(content="You are a helpful AI assistant. Use the available tools to answer questions."),
         HumanMessage(content=user_query)
     ]
     
     is_stopped = False
+    last_ai_msg = None
 
     # Dynamic execution loop
     for step in range(5):
         ai_msg = agent.plan(messages)
         messages.append(ai_msg)
+        last_ai_msg = ai_msg
 
         if not ai_msg.tool_calls or is_stopped:
             break 
@@ -51,22 +53,16 @@ def run_pipeline(user_query):
             
             elif status == "BLOCK":
                 print(f"[SYSTEM] ⛔ BLOCKED: {reason}")
-
-            # --- EXECUTION ---
-            if execute_action:
-                result = tools_map[tool_call['name']].invoke(tool_call['args'])
-                messages.append(ToolMessage(content=str(result), tool_call_id=tool_call['id']))
-            else:
                 # Provide the feedback to the agent so it knows why it failed
-                messages.append(ToolMessage(content=f"SECURITY OR HUMAN ERROR: {reason}", tool_call_id=tool_call['id']))
-                is_stopped = True 
-                break 
+                messages.append(ToolMessage(content=f"SECURITY ERROR: {reason}", tool_call_id=tool_call['id']))
+                # Don't set is_stopped, let the agent try again or respond 
 
-    # Handle the final explanation if stopped/blocked
+    # Handle the final response
     if is_stopped:
         messages.append(HumanMessage(content="The last action was not completed. Explain why."))
-    
-    final_response = agent.plan(messages)
+        final_response = agent.plan(messages)
+    else:
+        final_response = last_ai_msg
     print(f"\nFINAL RESPONSE: {final_response.content}")
 
 if __name__ == "__main__":
