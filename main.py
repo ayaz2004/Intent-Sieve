@@ -2,16 +2,44 @@ from src.agent import TaskAgent
 from src.sieve import IntentSieve
 from src.tools import available_tools
 from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/interception.log'),
+        logging.StreamHandler()
+    ]
+)
 
 def run_pipeline(user_query):
     print(f"\n{'='*50}\n>>> USER QUERY: {user_query}")
     
     agent = TaskAgent()
     sieve = IntentSieve()
-    tools_map = {t.name: t for t in available_tools}
+    # Build a resilient tools map: index tools by multiple possible names
+    tools_map = {}
+    for t in available_tools:
+        # try common attributes that may hold the tool name
+        candidates = set()
+        if hasattr(t, "name"):
+            candidates.add(t.name)
+        if hasattr(t, "__name__"):
+            candidates.add(t.__name__)
+        func = getattr(t, "func", None)
+        if func and hasattr(func, "__name__"):
+            candidates.add(func.__name__)
+        # normalize and add
+        for n in list(candidates):
+            if n is None:
+                continue
+            tools_map[n] = t
+            tools_map[n.lower()] = t
     
     messages = [
-        SystemMessage(content="You are a helpful AI assistant. Use the available tools to answer questions."),
+        SystemMessage(content="You are a helpful AI assistant with access to tools. Use the tools to answer user queries. If an action is blocked for security reasons, explain the risk to the user."),
         HumanMessage(content=user_query)
     ]
     
@@ -23,6 +51,7 @@ def run_pipeline(user_query):
         ai_msg = agent.plan(messages)
         messages.append(ai_msg)
         last_ai_msg = ai_msg
+        # (no debug prints)
 
         if not ai_msg.tool_calls or is_stopped:
             break 
@@ -53,9 +82,54 @@ def run_pipeline(user_query):
             
             elif status == "BLOCK":
                 print(f"[SYSTEM] ⛔ BLOCKED: {reason}")
+
+            # --- EXECUTION ---
+            if execute_action:
+                # Resolve tool object robustly
+                requested_name = tool_call.get("name")
+                tool_obj = tools_map.get(requested_name) or tools_map.get(requested_name.lower())
+                if not tool_obj:
+                    # try fallback: replace spaces with underscores
+                    tool_obj = tools_map.get(requested_name.replace(" ", "_"))
+
+                if not tool_obj:
+                    print(f"[SYSTEM] ⚠️ Tool not found: {requested_name}")
+                    messages.append(ToolMessage(content=f"ERROR: Tool '{requested_name}' not available.", tool_call_id=tool_call['id']))
+                    is_stopped = True
+                    break
+
+                # Try different invocation styles with safe error handling
+                try:
+                    args = tool_call.get("args") or {}
+                    if hasattr(tool_obj, "invoke"):
+                        try:
+                            result = tool_obj.invoke(args)
+                        except TypeError:
+                            result = tool_obj.invoke(**args)
+                    elif hasattr(tool_obj, "run"):
+                        try:
+                            result = tool_obj.run(args)
+                        except TypeError:
+                            result = tool_obj.run(**args)
+                    elif callable(tool_obj):
+                        try:
+                            result = tool_obj(**(args or {}))
+                        except TypeError:
+                            result = tool_obj(args)
+                    else:
+                        raise RuntimeError("Tool object is not callable")
+                except Exception as e:
+                    print(f"[SYSTEM] Tool execution error: {e}")
+                    messages.append(ToolMessage(content=f"ERROR: Tool execution failed: {e}", tool_call_id=tool_call['id']))
+                    is_stopped = True
+                    break
+
+                messages.append(ToolMessage(content=str(result), tool_call_id=tool_call['id']))
+            else:
                 # Provide the feedback to the agent so it knows why it failed
-                messages.append(ToolMessage(content=f"SECURITY ERROR: {reason}", tool_call_id=tool_call['id']))
-                # Don't set is_stopped, let the agent try again or respond 
+                messages.append(ToolMessage(content=f"SECURITY OR HUMAN ERROR: {reason}", tool_call_id=tool_call['id']))
+                is_stopped = True 
+                break 
 
     # Handle the final response
     if is_stopped:
