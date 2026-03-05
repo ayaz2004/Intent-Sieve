@@ -1,23 +1,26 @@
-# Virtual Environment (Crucial since you created 'venv')
+# Python
 venv/
-.venv/
-env/
-
-# Python Caches (Removes the __pycache__ folders seen in your files)
 __pycache__/
 *.py[cod]
-*$py.class
+*.so
 
-# Local Logs (To prevent tracking your interception.log)
-logs/*.log
+# Logs
+logs/
 *.log
 
-# VS Code Settings
+# IDE
 .vscode/
+.idea/
 
-# OS Specific files
+# OS
 .DS_Store
 Thumbs.db
 
-# Environment Secrets (If you later add a .env file for API keys)
+# Secrets
 .env
+*.key
+*.pem
+
+# Temporary
+*.tmp
+*~

@@ -3,10 +3,22 @@ import time
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
 
+# Import our new security modules
+from .isolation import ContextualIsolator
+from .detectors import InjectionDetector
+
 class IntentSieve:
     def __init__(self):
         # Neural reasoning for high-risk validation
         self.guard = ChatOllama(model="llama-guard3:8b", temperature=0)
+        
+        # NEW: Add contextual isolation and detection layers
+        self.isolator = ContextualIsolator(max_length=10000)
+        self.detector = InjectionDetector(
+            keyword_threshold=0.15,
+            entropy_threshold=4.5,
+            repetition_threshold=0.3
+        )
         
     def _is_argument_consistent(self, original_intent, tool_args):
         intent_lower = original_intent.lower()
@@ -18,6 +30,8 @@ class IntentSieve:
 
     def validate(self, original_intent, tool_call):
         """
+        Enhanced validation with multi-layer security.
+        
         Returns a tuple: (STATUS, REASON)
         STATUS can be: "ALLOW", "BLOCK", "REVIEW"
         """
@@ -26,6 +40,30 @@ class IntentSieve:
         args = tool_call['args']
         
         print(f"\n[SIEVE] Analyzing action: {action}...")
+
+        # --- LAYER 0: CONTEXTUAL ISOLATION (NEW!) ---
+        # Sanitize the user intent to remove hidden attacks
+        cleaned_intent, isolation_metadata = self.isolator.sanitize(original_intent)
+        
+        # If sanitization detected threats, log them
+        if isolation_metadata['threats_detected']:
+            logging.warning(f"[ISOLATION] Threats cleaned: {isolation_metadata['threats_detected']}")
+        
+        # --- LAYER 0.5: INJECTION DETECTION (NEW!) ---
+        # Analyze the cleaned intent for injection patterns
+        threats, injection_risk = self.detector.analyze(cleaned_intent)
+        
+        # If high injection risk detected, BLOCK immediately
+        if injection_risk > 0.7:
+            threat_details = ', '.join([t.threat_type for t in threats])
+            return "BLOCK", f"High injection risk detected ({injection_risk:.2f}): {threat_details}"
+        
+        # If medium injection risk, flag for additional scrutiny
+        if injection_risk > 0.4:
+            logging.warning(f"[DETECTOR] Medium injection risk: {injection_risk:.2f}")
+        
+        # Use cleaned intent for remaining validation
+        original_intent = cleaned_intent
 
         # --- LAYER 1: SYMBOLIC (Hallucination/Drift Check) ---
         # We ensure the model isn't inventing actions the user didn't ask for.
