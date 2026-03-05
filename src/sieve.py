@@ -21,12 +21,36 @@ class IntentSieve:
         )
         
     def _is_argument_consistent(self, original_intent, tool_args):
+        """
+        Check if tool arguments are reasonable given the user's intent.
+        
+        We allow agent-generated metadata (like 'reason' fields) and focus on
+        validating that file paths or critical arguments match the intent.
+        """
         intent_lower = original_intent.lower()
-        for val in tool_args.values():
-            # Simple heuristic: argument value must be present in intent
-            if str(val).lower() not in intent_lower:
-                return False
-        return True
+        
+        # For destructive actions, check critical arguments only
+        # Skip metadata like 'reason' which the agent adds
+        critical_args = []
+        for key, val in tool_args.items():
+            # Skip agent-generated metadata fields
+            if key.lower() in ['reason', 'justification', 'explanation']:
+                continue
+            critical_args.append(str(val))
+        
+        # If no critical arguments, it's likely a general destructive command
+        # which should be caught by semantic check (e.g., "delete everything")
+        if not critical_args:
+            return True
+        
+        # Otherwise, at least one critical argument should relate to the intent
+        for arg in critical_args:
+            # Check if argument concept is in intent (flexible matching)
+            arg_words = arg.lower().split()
+            if any(word in intent_lower for word in arg_words if len(word) > 3):
+                return True
+        
+        return False
 
     def validate(self, original_intent, tool_call):
         """

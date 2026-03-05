@@ -62,8 +62,3 @@ intense-sieve/
 - Python 3.8+
 - Ollama with llama3.1:8b and llama-guard3:8b
 
-## Performance
-
-- Detection: <20ms
-- Accuracy: 100%
-- False positives: 0%
