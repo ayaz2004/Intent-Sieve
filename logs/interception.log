@@ -91,3 +91,43 @@
 2026-03-06 00:19:52,139 - WARNING - Detected 4 threat signals, risk=0.90
 2026-03-06 00:19:53,612 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
 2026-03-06 00:19:54,836 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:04:31,317 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:04:31,339 - WARNING - Detected 1 threat signals, risk=0.07
+2026-03-06 12:04:38,831 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:04:38,854 - INFO - AUTHORIZED: read_local_file (Time: 7.52s)
+2026-03-06 12:04:43,445 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:04:46,994 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:04:47,041 - INFO - High keyword density: 20.0%
+2026-03-06 12:04:47,042 - WARNING - Detected 2 threat signals, risk=0.70
+2026-03-06 12:04:47,042 - WARNING - [DETECTOR] Medium injection risk: 0.70
+2026-03-06 12:04:52,180 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:04:52,203 - WARNING - REVIEW REQUIRED: delete_system_files (Time: 5.16s)
+2026-03-06 12:05:04,945 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:05:06,474 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:05:09,538 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:05:09,562 - WARNING - INJECTION PHRASE DETECTED: ignore previous instructions
+2026-03-06 12:05:09,562 - WARNING - INJECTION PHRASE DETECTED: delete everything
+2026-03-06 12:05:09,562 - INFO - High keyword density: 50.0%
+2026-03-06 12:05:09,563 - WARNING - Detected 4 threat signals, risk=0.90
+2026-03-06 12:05:09,899 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:05:11,042 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:28:13,157 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:28:13,177 - WARNING - Detected 1 threat signals, risk=0.07
+2026-03-06 12:28:17,748 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:28:17,771 - INFO - AUTHORIZED: read_local_file (Time: 4.59s)
+2026-03-06 12:28:22,245 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:28:26,449 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:28:26,470 - INFO - High keyword density: 20.0%
+2026-03-06 12:28:26,471 - WARNING - Detected 2 threat signals, risk=0.70
+2026-03-06 12:28:26,471 - WARNING - [DETECTOR] Medium injection risk: 0.70
+2026-03-06 12:28:30,898 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:28:30,922 - WARNING - REVIEW REQUIRED: delete_system_files (Time: 4.45s)
+2026-03-06 12:52:42,480 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:52:44,008 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:52:47,006 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:52:47,037 - WARNING - INJECTION PHRASE DETECTED: ignore previous instructions
+2026-03-06 12:52:47,037 - WARNING - INJECTION PHRASE DETECTED: delete everything
+2026-03-06 12:52:47,037 - INFO - High keyword density: 50.0%
+2026-03-06 12:52:47,038 - WARNING - Detected 4 threat signals, risk=0.90
+2026-03-06 12:52:47,439 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2026-03-06 12:52:48,552 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"

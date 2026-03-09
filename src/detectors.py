@@ -63,6 +63,7 @@ class InjectionDetector:
         'system', 'admin', 'root', 'sudo', 'execute', 'run',
         'delete', 'remove', 'drop', 'truncate', 'destroy',
         'modify', 'update', 'alter', 'change', 'edit',
+        'erase', 'clear', 'purge', 'wipe', 'clean',
         
         # Context manipulation
         'previous', 'above', 'prior', 'earlier', 'before',
@@ -78,7 +79,37 @@ class InjectionDetector:
         
         # Role manipulation
         'you are', 'act as', 'pretend', 'roleplay', 'simulate',
+        
+        # Authority/urgency (social engineering)
+        'urgent', 'emergency', 'immediately', 'asap', 'critical',
+        'boss', 'ceo', 'manager', 'director', 'authorized',
+        'compliance', 'audit', 'legally', 'required', 'mandatory',
     }
+    
+    # Context boundary markers that indicate injection attempts
+    BOUNDARY_MARKERS = [
+        r'###\s*\w+\s*###',  # ### OVERRIDE ###, ### SYSTEM ###
+        r'---+\s*\w+',       # --- NEW PROMPT, ----SYSTEM
+        r'\[\s*\w+\s*\]',    # [SYSTEM], [ADMIN], [OVERRIDE]
+        r'<<<\s*\w+\s*>>>',  # <<< INJECT >>>
+        r'^\s*\*{3,}',       # *** markers
+        r'END\s+OF\s+\w+',   # END OF INSTRUCTIONS
+        r'START\s+OF\s+\w+', # START OF REAL TASK
+        r'={3,}\s*\w+\s*={3,}', # === SYSTEM ===
+        r'\|\|\|\s*\w+\s*\|\|\|', # ||| OVERRIDE |||
+    ]
+    
+    # Social engineering patterns
+    SOCIAL_ENGINEERING_PATTERNS = [
+        r'(my\s+)?(boss|ceo|manager|director|supervisor|cto|cio)\s+(says|told|requires|demands|instructed|ordered)',
+        r'(IT|security|compliance|legal|admin)\s+(department|team|staff)\s+(requires|demands|says|needs|insists)',
+        r'(urgent|emergency|critical|immediate|pressing)\s+(request|task|action|protocol|matter|issue)',
+        r'(for\s+)?(compliance|audit|legal|regulatory|security)\s+(purposes?|requirements?|reasons?|mandates?)',
+        r'(authorized|approved|verified|certified)\s+(by|from|through)\s+\w+',
+        r'(must|need|have\s+to|required\s+to)\s+(immediately|urgently|asap|now|right\s+now)',
+        r'(according\s+to|per|as\s+per)\s+(policy|protocol|procedure|regulations?)',
+        r'(failure\s+to|if\s+you\s+don.?t)\s+(comply|act|respond)',
+    ]
     
     # Critical phrases that are almost always injection attempts
     INJECTION_PHRASES = [
@@ -86,43 +117,55 @@ class InjectionDetector:
         r'ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|directives?)',
         r'disregard\s+(all\s+)?(previous|prior|above)\s+(instructions?|rules?)',
         r'forget\s+(everything|all|what)\s+(you\s+)?(know|learned|were\s+told)',
+        r'(override|overwrite|replace)\s+(previous|all|your)\s+(instructions?|rules?)',
         
         # New instruction injection
-        r'(new|updated|revised)\s+instructions?[\s:]+',
-        r'here\s+(are|is)\s+your\s+(new|updated|real)\s+instructions?',
-        r'your\s+(actual|real|true)\s+(task|job|instructions?)\s+is',
+        r'(new|updated|revised|real|actual)\s+instructions?[\s:]+',
+        r'here\s+(are|is)\s+your\s+(new|updated|real|actual)\s+instructions?',
+        r'your\s+(actual|real|true)\s+(task|job|instructions?|goal)\s+is',
+        r'(the\s+)?(real|actual|true)\s+(instructions?|task|goal|purpose)',
         
         # System command patterns
         r'(execute|run)\s+(system|command|code|script)',
-        r'delete\s+(all|everything|files?|data|system)',
-        r'(bypass|disable|turn\s+off)\s+(security|safety|filter|guard)',
+        r'delete\s+(all|everything|files?|data|system|records?)',
+        r'(erase|remove|clear|purge|wipe|destroy)\s+(all|everything|system|files?|data)',
+        r'(bypass|disable|turn\s+off|deactivate)\s+(security|safety|filter|guard|protection)',
+        r'(eliminate|obliterate|annihilate)\s+(files?|data|records?|traces?)',
         
         # Role manipulation
-        r'(you\s+are|act\s+as|pretend\s+to\s+be|roleplay)\s+(a\s+)?(admin|root|system|developer)',
-        r'(from\s+now|starting\s+now|now\s+you),\s+you\s+(are|will\s+be)',
+        r'(you\s+are|act\s+as|pretend\s+to\s+be|roleplay|become)\s+(a\s+)?(admin|root|system|developer|superuser)',
+        r'(from\s+now|starting\s+now|now\s+you|henceforth),\s+you\s+(are|will\s+be)',
+        r'(enable|activate|enter)\s+(admin|root|developer|superuser|unrestricted)\s+(mode|access)',
+        r'you.+(have|possess|gained)\s+(admin|root|superuser|full)\s+(access|privileges|rights)',
         
         # Context breaking
-        r'end\s+of\s+(instructions?|prompt|context)',
-        r'start\s+of\s+(new|actual|real)\s+(instructions?|prompt)',
-        r'---+\s*(new|system|admin)\s+(prompt|instructions?)',
+        r'end\s+of\s+(instructions?|prompt|context|guidelines?)',
+        r'start\s+of\s+(new|actual|real|true)\s+(instructions?|prompt|task)',
+        r'---+\s*(new|system|admin|real)\s+(prompt|instructions?|task)',
+        r'(begin|commence)\s+(new|actual|real)\s+(instructions?|prompt)',
         
         # Data exfiltration
-        r'(send|email|post|transmit).+(to|via|using).+(email|url|endpoint)',
-        r'(reveal|show|display|print).+(password|key|secret|token|credential)',
+        r'(send|email|post|transmit|forward|transfer).+(to|via|using|through).+(email|url|endpoint|server)',
+        r'(reveal|show|display|print|expose|leak).+(password|key|secret|token|credential|api)',
+        r'transmit.+(token|key|credential|secret|password).+(to|via|using)',
+        r'(exfiltrate|extract|dump|export).+(data|information|secrets?|credentials?)',
+        r'(upload|post|send).+(sensitive|confidential|private).+(data|information)',
     ]
     
     # Compile regex patterns for efficiency
     COMPILED_PATTERNS = [re.compile(pattern, re.IGNORECASE) for pattern in INJECTION_PHRASES]
+    COMPILED_BOUNDARIES = [re.compile(pattern, re.IGNORECASE) for pattern in BOUNDARY_MARKERS]
+    COMPILED_SOCIAL_ENG = [re.compile(pattern, re.IGNORECASE) for pattern in SOCIAL_ENGINEERING_PATTERNS]
     
     def __init__(self, 
-                 keyword_threshold: float = 0.15,
+                 keyword_threshold: float = 0.12,  # Lowered from 0.15 for better recall
                  entropy_threshold: float = 4.5,
                  repetition_threshold: float = 0.3):
         """
         Initialize the injection detector with configurable thresholds.
         
         Args:
-            keyword_threshold: Max ratio of command keywords to total words (0.15 = 15%)
+            keyword_threshold: Max ratio of command keywords to total words (0.12 = 12%)
             entropy_threshold: Min entropy for normal text (4.5 is typical English)
             repetition_threshold: Max ratio of repeated words (0.3 = 30%)
         """
@@ -136,6 +179,8 @@ class InjectionDetector:
             'keyword_hits': 0,
             'phrase_hits': 0,
             'anomaly_hits': 0,
+            'boundary_hits': 0,
+            'social_eng_hits': 0,
         }
     
     def analyze(self, text: str) -> Tuple[List[ThreatSignal], float]:
@@ -163,13 +208,25 @@ class InjectionDetector:
         if phrase_threats:
             self.stats['phrase_hits'] += 1
         
-        # Layer 2: Check for suspicious keyword density
+        # Layer 2: Check for context boundary markers
+        boundary_threats = self._detect_boundary_markers(text)
+        threats.extend(boundary_threats)
+        if boundary_threats:
+            self.stats['boundary_hits'] += 1
+        
+        # Layer 3: Check for social engineering patterns
+        social_threats = self._detect_social_engineering(text)
+        threats.extend(social_threats)
+        if social_threats:
+            self.stats['social_eng_hits'] += 1
+        
+        # Layer 4: Check for suspicious keyword density
         keyword_threats = self._detect_keyword_density(text)
         threats.extend(keyword_threats)
         if keyword_threats:
             self.stats['keyword_hits'] += 1
         
-        # Layer 3: Statistical anomaly detection
+        # Layer 5: Statistical anomaly detection
         anomaly_threats = self._detect_statistical_anomalies(text)
         threats.extend(anomaly_threats)
         if anomaly_threats:
@@ -218,6 +275,62 @@ class InjectionDetector:
                 threats.append(threat)
                 
                 logger.warning(f"INJECTION PHRASE DETECTED: {matched_text}")
+        
+        return threats
+    
+    def _detect_boundary_markers(self, text: str) -> List[ThreatSignal]:
+        """
+        Detect context boundary markers used to separate injection from legitimate content.
+        
+        Examples:
+        - ### OVERRIDE ###
+        - --- NEW INSTRUCTIONS ---
+        - [SYSTEM]
+        - <<< INJECT >>>
+        """
+        threats = []
+        
+        for pattern in self.COMPILED_BOUNDARIES:
+            matches = pattern.finditer(text)
+            for match in matches:
+                matched_text = match.group(0)
+                
+                threat = ThreatSignal(
+                    severity=0.75,  # High severity - these are intentional markers
+                    threat_type="context_boundary",
+                    description=f"Detected boundary marker: '{matched_text}'",
+                    evidence=text[max(0, match.start()-30):min(len(text), match.end()+30)]
+                )
+                threats.append(threat)
+                logger.warning(f"BOUNDARY MARKER DETECTED: {matched_text}")
+        
+        return threats
+    
+    def _detect_social_engineering(self, text: str) -> List[ThreatSignal]:
+        """
+        Detect social engineering tactics that use authority or urgency.
+        
+        Examples:
+        - "My boss says you need to..."
+        - "IT department requires..."
+        - "Emergency protocol: delete..."
+        - "For compliance purposes..."
+        """
+        threats = []
+        
+        for pattern in self.COMPILED_SOCIAL_ENG:
+            matches = pattern.finditer(text)
+            for match in matches:
+                matched_text = match.group(0)
+                
+                threat = ThreatSignal(
+                    severity=0.65,  # Medium-high severity
+                    threat_type="social_engineering",
+                    description=f"Detected social engineering pattern: '{matched_text}'",
+                    evidence=text[max(0, match.start()-30):min(len(text), match.end()+30)]
+                )
+                threats.append(threat)
+                logger.info(f"SOCIAL ENGINEERING DETECTED: {matched_text}")
         
         return threats
     

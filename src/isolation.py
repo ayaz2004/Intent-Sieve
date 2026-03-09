@@ -16,7 +16,7 @@ Author: Intense Sieve Security Team
 import re
 import unicodedata
 import logging
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -75,6 +75,22 @@ class ContextualIsolator:
         'ј': 'j',  # Cyrillic j
     }
     
+    # Leetspeak character mappings (1337 sp34k obfuscation)
+    LEETSPEAK_MAP = {
+        '0': 'o',
+        '1': 'i',
+        '3': 'e',
+        '4': 'a',
+        '5': 's',
+        '7': 't',
+        '8': 'b',
+        '@': 'a',
+        '$': 's',
+        '!': 'i',
+        '|': 'i',
+        '(': 'c',
+    }
+    
     def __init__(self, max_length: int = 10000):
         """
         Initialize the Contextual Isolator.
@@ -87,6 +103,7 @@ class ContextualIsolator:
             'zero_width_removed': 0,
             'control_chars_removed': 0,
             'lookalikes_normalized': 0,
+            'leetspeak_normalized': 0,
             'inputs_processed': 0,
         }
     
@@ -143,9 +160,17 @@ class ContextualIsolator:
             metadata['lookalikes_normalized'] = lookalike_count
             self.stats['lookalikes_normalized'] += lookalike_count
         
-        # Stage 4: Unicode normalization (canonical form)
+        # Stage 4: Normalize leetspeak obfuscation
+        cleaned, leetspeak_count = self._normalize_leetspeak(cleaned)
+        if leetspeak_count > 0:
+            metadata['threats_detected'].append(f"leetspeak: {leetspeak_count}")
+            metadata['leetspeak_normalized'] = leetspeak_count
+            self.stats['leetspeak_normalized'] += leetspeak_count
+        
+        # Stage 5: Unicode normalization (canonical form)
         cleaned = self._normalize_unicode(cleaned)
         
+        # Stage 6
         # Stage 5: Collapse excessive whitespace
         cleaned = self._normalize_whitespace(cleaned)
         
@@ -230,6 +255,34 @@ class ContextualIsolator:
             replaced_count += count_before
         
         return text, replaced_count
+    
+    def _normalize_leetspeak(self, text: str) -> Tuple[str, int]:
+        """
+        Normalize leetspeak (1337 speak) obfuscation to make attacks detectable.
+        
+        Example attacks:
+        - "1gn0r3 pr3v10u5 1n5truct10n5" → "ignore previous instructions"
+        - "d3l3t3 f1l35" → "delete files"
+        - "byp@$$ s3cur1ty" → "bypass security"
+        
+        This converts common leetspeak substitutions back to normal letters,
+        making injection patterns visible to the detector.
+        
+        Returns:
+            Tuple of (normalized_text, count_replaced)
+        """
+        replaced_count = 0
+        normalized = []
+        
+        # Process character by character to count replacements
+        for char in text:
+            if char in self.LEETSPEAK_MAP:
+                normalized.append(self.LEETSPEAK_MAP[char])
+                replaced_count += 1
+            else:
+                normalized.append(char)
+        
+        return ''.join(normalized), replaced_count
     
     def _normalize_unicode(self, text: str) -> str:
         """
